@@ -131,6 +131,7 @@ class Watch {
         return this.job.start()
     }
 
+    // chuẩn bị data cho chiến dịch & khởi tạo chiến dịch & chạy chiến dịch
     async processSymbol(symbol = "", intervalTime = "", strategies = [""], additionalRequirements = {}) {
         const data = await this.prepareDataForStrategies(strategies, symbol, intervalTime, additionalRequirements)
 
@@ -148,6 +149,7 @@ class Watch {
         }))
     }
 
+    // lấy data cho tất cả chiến lược theo yêu cầu mặc định và yêu cầu phụ
     async prepareDataForStrategies(strategies = [""], symbol = "", intervalTime = "", additionalRequirements = {}) {
 
         // combine requirements of many strategies
@@ -160,11 +162,13 @@ class Watch {
 
         const dataObj = {}
 
+        // lấy thêm data theo yêu cầu phụ
         if (typeof additionalRequirements === "object" && Object.keys(additionalRequirements).length > 0) {
             const additionalData = await this.getDataByAdditionalRequirement(symbol, additionalRequirements)
             dataObj["additional"] = additionalData
         }
 
+        // lấy data theo yêu cầu mặc định của chiến lược
         await Promise.all(
             Object.keys(mapRequirements).map(async requirement => {
                 try {
@@ -185,6 +189,7 @@ class Watch {
         return dataObj
     }
 
+    // bổ sung data theo yêu cầu
     async getDataByAdditionalRequirement(symbol = "", additionalRequirements = {}) {
         const obj = {}
 
