@@ -14,10 +14,15 @@ const candleDefault = {
 }
 
 class RichardRSI {
-    constructor(logger, data = { candles: candleDefault }) {
+    constructor(logger, symbol = "", intervalTime = "", data = { candles: candleDefault, additional: {} }) {
         this.logger = logger
         this.candles = data.candles
+        this.symbol = symbol
+        this.intervalTime = intervalTime
 
+        this.highCandles = data.additional && data.additional.candles && data.additional.candles[0]
+
+        console.log("initial strategy", { symbol, intervalTime })
         this.signal = constants.SIGNAL.NORMAL
     }
 

@@ -21,6 +21,7 @@ class Watch {
     }
 
     listSymbols() {
+
         return [
             {
                 symbol: "BTCUSDT",
@@ -28,18 +29,22 @@ class Watch {
                     {
                         time: "15m",
                         strategies: ["richard_rsi_1"],
+                        additionalRequirements: { candles: [{ intervalTime: "30m", limit: 5 }] }
                     },
                     {
                         time: "30m",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                     {
                         time: "1h",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                     {
                         time: "5m",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                 ],
             },
@@ -49,18 +54,22 @@ class Watch {
                     {
                         time: "15m",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                     {
                         time: "30m",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                     {
                         time: "1h",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                     {
                         time: "5m",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                 ],
             },
@@ -70,18 +79,22 @@ class Watch {
                     {
                         time: "15m",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                     {
                         time: "30m",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                     {
                         time: "1h",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                     {
                         time: "5m",
                         strategies: ["richard_rsi_1"],
+                        // additionalRequirements: { candles: [{ intervalTime: "30m", limit: 100 }] }
                     },
                 ],
             }
@@ -109,7 +122,7 @@ class Watch {
                     // this.logger.info("=== Process symbol ===", { symbol: pair.symbol })
                     return Promise.all(pair.intervals.map(interval => {
                         // this.logger.info("--- Process interval time --- ", { symbol: pair.symbol, time: interval.time })
-                        return this.processSymbol(pair.symbol, interval.time, interval.strategies)
+                        return this.processSymbol(pair.symbol, interval.time, interval.strategies, interval.additionalRequirements)
                     }))
                 })
             )
@@ -118,12 +131,12 @@ class Watch {
         return this.job.start()
     }
 
-    async processSymbol(symbol = "", intervalTime = "", strategies = [""]) {
-        const data = await this.prepareDataForStrategies(strategies, symbol, intervalTime)
+    async processSymbol(symbol = "", intervalTime = "", strategies = [""], additionalRequirements = {}) {
+        const data = await this.prepareDataForStrategies(strategies, symbol, intervalTime, additionalRequirements)
 
         return Promise.all(strategies.map(async strategy => {
             try {
-                const process = new this.strategies[strategy].process(this.logger, data)
+                const process = new this.strategies[strategy].process(this.logger, symbol, intervalTime, data)
                 await process.execute()
 
                 this.logger.info(`[Strategy:${strategy}] ${symbol} - ${intervalTime}: ${process.getSignal()}`)
@@ -135,16 +148,22 @@ class Watch {
         }))
     }
 
-    async prepareDataForStrategies(strategies = [""], symbol = "", intervalTime = "",) {
+    async prepareDataForStrategies(strategies = [""], symbol = "", intervalTime = "", additionalRequirements = {}) {
 
         // combine requirements of many strategies
         const mapRequirements = {}
 
+        // map default requirements of strategy
         strategies.forEach(strategy => {
             mapRequirements[this.strategies[strategy].requirements] = 1
         })
 
         const dataObj = {}
+
+        if (typeof additionalRequirements === "object" && Object.keys(additionalRequirements).length > 0) {
+            const additionalData = await this.getDataByAdditionalRequirement(symbol, additionalRequirements)
+            dataObj["additional"] = additionalData
+        }
 
         await Promise.all(
             Object.keys(mapRequirements).map(async requirement => {
@@ -164,6 +183,37 @@ class Watch {
         )
 
         return dataObj
+    }
+
+    async getDataByAdditionalRequirement(symbol = "", additionalRequirements = {}) {
+        const obj = {}
+
+        const additionalRequirementsKeys = Object.keys(additionalRequirements)
+
+        for (let i = 0; i < additionalRequirementsKeys.length; i++) {
+            const dataKind = additionalRequirementsKeys[i]
+            try {
+                if (dataKind === constants.DATA_REQUIREMENTS.CANDLES) {
+                    const intervals = additionalRequirements[dataKind]
+                    if (intervals.length === 0) {
+                        return obj
+                    }
+
+                    const candles = await Promise.all(intervals.map(interval => {
+                        return this.binanceAPI.candles({ symbol: symbol, interval: interval.intervalTime, limit: interval.limit })
+                    }))
+
+                    obj[dataKind] = candles
+                }
+
+            } catch (error) {
+                this.logger.info("getDataByAdditionalRequirement have error", { error: error.message, symbol: symbol, dataKind: dataKind })
+                console.trace(error)
+                throw error
+            }
+        }
+
+        return obj
     }
 
 
